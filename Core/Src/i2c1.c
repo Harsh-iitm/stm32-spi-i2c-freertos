@@ -8,26 +8,6 @@
 #define MPU6050_ADDR 0x68u
 static volatile uint32_t recovery_count;
 
-enum { IRQ_IDLE, IRQ_START_WRITE, IRQ_ADDR_WRITE, IRQ_REG_TX,
-       IRQ_START_READ, IRQ_ADDR_READ, IRQ_RX, IRQ_RX_LAST_TWO,
-       IRQ_RX_LAST_ONE, IRQ_RX_SINGLE };
-static struct {
-    TaskHandle_t volatile owner;
-    uint8_t address, reg, *data, length, index;
-    volatile int result;
-    volatile uint8_t phase;
-} i2c_irq;
-
-static void i2c_irq_finish(int result, BaseType_t *higher_priority_task_woken) {
-    I2C1->CR2 &= ~(I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);
-    I2C1->CR1 |= I2C_CR1_ACK;
-    i2c_irq.result = result;
-    i2c_irq.phase = IRQ_IDLE;
-    TaskHandle_t owner = i2c_irq.owner;
-    i2c_irq.owner = 0;
-    if (owner != 0) vTaskNotifyGiveFromISR(owner, higher_priority_task_woken);
-}
-
 static int wait_sr1(uint32_t mask) {
     uint32_t timeout = I2C1_WAIT_LIMIT;
     while ((I2C1->SR1 & mask) == 0u) {
@@ -66,10 +46,6 @@ static void i2c1_recover(void) {
                     (2u << 16) | (2u << 18);
     GPIOB->AFR[1] = (GPIOB->AFR[1] & ~0xFFu) | 0x44u;
     i2c1_configure();
-    NVIC_SetPriority(I2C1_EV_IRQn, 6u);
-    NVIC_SetPriority(I2C1_ER_IRQn, 6u);
-    NVIC_EnableIRQ(I2C1_EV_IRQn);
-    NVIC_EnableIRQ(I2C1_ER_IRQn);
     ++recovery_count;
 }
 
@@ -81,6 +57,10 @@ void i2c1_init(void) {
                     (1u << 16) | (1u << 18);
     GPIOB->AFR[1] = (GPIOB->AFR[1] & ~0xFFu) | 0x44u;
     i2c1_configure();
+    NVIC_SetPriority(I2C1_EV_IRQn, 6u);
+    NVIC_SetPriority(I2C1_ER_IRQn, 6u);
+    NVIC_EnableIRQ(I2C1_EV_IRQn);
+    NVIC_EnableIRQ(I2C1_ER_IRQn);
 }
 
 /* Interrupt receive state. The address/register preamble is polled; each data
