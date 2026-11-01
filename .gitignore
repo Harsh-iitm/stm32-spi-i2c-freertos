@@ -1,0 +1,13 @@
+Debug/
+Release/
+build/
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.o
+*.d
+*.launch
+*.settings/
+.metadata/
