@@ -10,7 +10,9 @@ typedef struct {
 void board_init(void);
 int mpu6050_init(void);
 int mpu6050_read(imu_sample_t *sample);
+int mpu6050_read_irq(imu_sample_t *sample);
 void uart_write(const char *text);
 void spi1_init(void);
 uint8_t spi1_transfer(uint8_t value);
+int spi1_transfer_irq(uint8_t value, uint8_t *received);
 #endif

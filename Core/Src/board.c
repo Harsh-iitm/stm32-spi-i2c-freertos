@@ -1,5 +1,10 @@
 #include "stm32f4xx.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include "app.h"
+
+static TaskHandle_t volatile spi_irq_owner;
+static volatile uint8_t spi_irq_result;
 
 void board_init(void) {
     /* Nucleo-F401RE starts from the 16 MHz HSI clock; no PLL is assumed. */
@@ -31,6 +36,8 @@ void spi1_init(void) {
     GPIOA->BSRR = 1u << 4;
     SPI1->CR1 = SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_BR_0;
     SPI1->CR1 |= SPI_CR1_SPE;
+    NVIC_SetPriority(SPI1_IRQn, 6u);
+    NVIC_EnableIRQ(SPI1_IRQn);
 }
 
 uint8_t spi1_transfer(uint8_t value) {
@@ -38,4 +45,32 @@ uint8_t spi1_transfer(uint8_t value) {
     *(__IO uint8_t *)&SPI1->DR = value;
     while ((SPI1->SR & SPI_SR_RXNE) == 0u) {}
     return *(__IO uint8_t *)&SPI1->DR;
+}
+
+int spi1_transfer_irq(uint8_t value, uint8_t *received) {
+    if (received == 0 || spi_irq_owner != 0) return -1;
+    (void)ulTaskNotifyTake(pdTRUE, 0u);
+    spi_irq_owner = xTaskGetCurrentTaskHandle();
+    SPI1->CR2 |= SPI_CR2_RXNEIE;
+    *(__IO uint8_t *)&SPI1->DR = value;
+    if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10u)) == 0u) {
+        SPI1->CR2 &= ~SPI_CR2_RXNEIE;
+        spi_irq_owner = 0;
+        return -1;
+    }
+    *received = spi_irq_result;
+    return 0;
+}
+
+void SPI1_IRQHandler(void) {
+    BaseType_t higher_priority_task_woken = pdFALSE;
+    if ((SPI1->SR & SPI_SR_RXNE) != 0u && (SPI1->CR2 & SPI_CR2_RXNEIE) != 0u) {
+        spi_irq_result = *(__IO uint8_t *)&SPI1->DR;
+        SPI1->CR2 &= ~SPI_CR2_RXNEIE;
+        TaskHandle_t owner = spi_irq_owner;
+        spi_irq_owner = 0;
+        if (owner != 0)
+            vTaskNotifyGiveFromISR(owner, &higher_priority_task_woken);
+    }
+    portYIELD_FROM_ISR(higher_priority_task_woken);
 }
