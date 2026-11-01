@@ -1,6 +1,6 @@
 # STM32 SPI/I2C Bare-Metal Drivers with FreeRTOS
 
-Register-level firmware for an STM32 Nucleo-F401RE. The current source tree contains direct-register GPIO, SPI1, USART2 and I2C1 setup, MPU6050 reads, an I2C bus-clear routine, and two FreeRTOS tasks connected by a queue.
+Register-level firmware for an STM32 Nucleo-F401RE. The source tree contains direct-register GPIO, SPI1, USART2 and I2C1 setup, MPU6050 reads, an I2C bus-clear routine, and two FreeRTOS tasks connected by a queue.
 
 The implementation includes polling and interrupt-driven SPI byte transfers, polling I2C reads, and an I2C interrupt-driven receive path.
 
@@ -39,16 +39,10 @@ cmake --build build
 
 The build produces `stm32_spi_i2c_freertos.elf`, `.hex`, and `.bin` files. The project uses the included STM32F401RE linker script and startup file from the pinned CMSIS device package. Flash the ELF or HEX using STM32CubeProgrammer, then open the ST-LINK virtual COM port at 115200 baud.
 
-## Performance results
+## Transfer modes and scheduling
 
-The project results are:
-
-- 100% bus recovery in fault-injection tests.
-- Approximately 35% lower worst-case task response latency after addressing priority inversion with priority inheritance.
-- Approximately 40% lower CPU utilization for interrupt-driven versus polling I2C at equivalent sampling rates.
-
-`SENSOR_I2C_MODE_IRQ` in `Core/Src/main.c` selects the interrupt-driven or polling I2C sampling path.
+`SENSOR_I2C_MODE_IRQ` in `Core/Src/main.c` selects the interrupt-driven or polling I2C sampling path. The sensor task publishes the latest successful sample to a one-element overwrite queue; the output task consumes samples and writes formatted records over UART. A FreeRTOS mutex protects UART writes.
 
 ## Skills
 
-Embedded C · Bare-metal register programming · STM32 · FreeRTOS · SPI · I2C · UART · ISR design · task synchronization · fault recovery · performance measurement
+Embedded C · Bare-metal register programming · STM32 · FreeRTOS · SPI · I2C · UART · ISR design · task synchronization · fault recovery
