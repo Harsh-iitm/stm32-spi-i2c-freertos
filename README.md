@@ -11,7 +11,7 @@ The implementation includes polling and interrupt-driven SPI byte transfers, pol
 - `Core/Src/main.c` — 100 Hz sensor task, selectable polling/interrupt I2C mode, one-element overwrite queue, and UART output task.
 - `FreeRTOSConfig.h` — Cortex-M4F FreeRTOS configuration with dynamic allocation and mutexes enabled.
 
-Peripheral registers are accessed directly; STM32 HAL is not used. The firmware uses CMSIS Core and STM32F4 device headers, the FreeRTOS kernel and its ARM_CM4F port, and the STM32CubeIDE startup and linker files.
+Peripheral registers are accessed directly; STM32 HAL is not used. CMSIS Core, the STM32F4 device package, and FreeRTOS Kernel are pinned as Git submodules. The repository includes its startup integration, linker script, CMake project, and Arm GNU toolchain file.
 
 ## Board connections
 
@@ -26,14 +26,18 @@ Peripheral registers are accessed directly; STM32 HAL is not used. The firmware 
 
 Use external I2C pull-up resistors if they are not present on the sensor breakout. The default I2C address is `0x68` (AD0 low). The code assumes the MCU remains on the reset-default 16 MHz HSI clock and configures I2C for 100 kHz.
 
-## Build integration
+## Build
 
-1. Create an STM32CubeIDE project for **NUCLEO-F401RE** and select the STM32F401RE device.
-2. Add the CMSIS Core and STM32F4 device headers to the compiler include path.
-3. Add the FreeRTOS kernel source files and the `portable/GCC/ARM_CM4F` port, plus a heap implementation such as `heap_4.c`.
-4. Add `Core/Src/main.c`, `Core/Src/board.c`, and `Core/Src/i2c1.c` to the build; add `Core/Inc` and this repository root to include paths.
-5. Ensure the startup file provides FreeRTOS SVC, PendSV, and SysTick handlers via the aliases in `FreeRTOSConfig.h`, plus the STM32 `I2C1_EV_IRQHandler`, `I2C1_ER_IRQHandler`, and `SPI1_IRQHandler` vector entries.
-6. Build with the Cortex-M4F hard-float ABI, flash the board, and open the ST-LINK virtual COM port at 115200 baud.
+Install CMake, Ninja, and the Arm GNU Toolchain. Clone with the pinned dependencies, then build:
+
+```sh
+git clone --recurse-submodules https://github.com/Harsh-iitm/stm32-spi-i2c-freertos.git
+cd stm32-spi-i2c-freertos
+cmake -S . -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
+cmake --build build
+```
+
+The build produces `stm32_spi_i2c_freertos.elf`, `.hex`, and `.bin` files. The project uses the included STM32F401RE linker script and startup file from the pinned CMSIS device package. Flash the ELF or HEX using STM32CubeProgrammer, then open the ST-LINK virtual COM port at 115200 baud.
 
 ## Performance results
 
